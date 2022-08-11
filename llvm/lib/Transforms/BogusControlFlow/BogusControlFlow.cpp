@@ -40,7 +40,12 @@ static cl::opt<unsigned> ConditionExpressionComplexity(
   cl::Optional
 );
 
-STATISTIC(BogusBasicBlocksCounter, "Counts number of basic blocks obfuscated");
+STATISTIC(BogusFunctionsCounter, "Number of functions");
+STATISTIC(BogusInitialBasicBlocksCounter, "Initial number of basic blocks");
+STATISTIC(BogusProceededBasicBlocksCounter, "Number of proceeded basic blocks");
+STATISTIC(BogusModifiedBasicBlocksCounter, "Number of modified basic blocks");
+STATISTIC(BogusAddedBasicBlocksCounter, "Number of added basic blocks");
+STATISTIC(BogusFinalBasicBlocksCounter, "Final number of basic blocks");
 
 static Instruction::BinaryOps Ops[] = {
   Instruction::Add, Instruction::Sub,
@@ -108,6 +113,7 @@ struct BogusControlFlow : public FunctionPass {
 
   void doBogusOnFunction(Function &F) {
 
+    BogusFunctionsCounter++;
     bool HasBeenModified = false;
 
     DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
@@ -127,6 +133,7 @@ struct BogusControlFlow : public FunctionPass {
 
       std::list<BasicBlock *> BasicBlocks;
       for (BasicBlock &BB : F) {
+        BogusInitialBasicBlocksCounter++;
         if (!BB.isEHPad() && !BB.isLandingPad() && !basicBlockContainsInlineAsm(BB))
           BasicBlocks.push_back(&BB);
       }
@@ -134,15 +141,15 @@ struct BogusControlFlow : public FunctionPass {
       DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                       errs() << "  Iterating on the basic blocks of function " << F.getName() << "\n");
       while (!BasicBlocks.empty()) {
-        BogusBasicBlocksCounter++;
+        BogusProceededBasicBlocksCounter++;
         if (llvm::SharedCryptoUtils->get_range(100) < ProbabilityRate) {
           DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
-                          errs() << "    Obfuscating basic block #" << BogusBasicBlocksCounter << "\n");
+                          errs() << "    Obfuscating basic block #" << BogusProceededBasicBlocksCounter << "\n");
           addBogusFlow(BasicBlocks.front(), F);
           HasBeenModified = true;
         } else {
           DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
-                          errs() << "    Skipping basic block #" << BogusBasicBlocksCounter << "\n");
+                          errs() << "    Skipping basic block #" << BogusProceededBasicBlocksCounter << "\n");
         }
         BasicBlocks.pop_front();
       }
@@ -174,6 +181,8 @@ struct BogusControlFlow : public FunctionPass {
 
   void addBogusFlow(BasicBlock *InputBB, Function &F) {
 
+    BogusModifiedBasicBlocksCounter++;
+
     // Split the block:
     // First part with only the phi nodes and debug info and
     // terminator created by splitBasicBlock (-> No instruction).
@@ -191,11 +200,15 @@ struct BogusControlFlow : public FunctionPass {
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    First and original basic block: ok\n");
 
+    BogusAddedBasicBlocksCounter++;
+
     // Creating the altered basic block on which the first basicBlock will jump to.
     Twine *Var3 = new Twine("AlteredBB");
     BasicBlock *AlteredBB = createAlteredBasicBlock(OriginalBB, *Var3, &F);
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    Altered basic block: ok\n");
+
+    BogusAddedBasicBlocksCounter++;
 
     // Now that all the blocks are created,
     // we modify the terminators to adjust the control flow.
@@ -244,6 +257,8 @@ struct BogusControlFlow : public FunctionPass {
     BasicBlock *OriginalBBPart2 = OriginalBB->splitBasicBlock(--I, *Var5);
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    Terminator of the original basic block is isolated\n");
+
+    BogusAddedBasicBlocksCounter++;
 
     // The first part go either on the return statement or on the beginning
     // of the altered block. So we erase the terminator created when splitting.
@@ -695,6 +710,8 @@ struct BogusControlFlow : public FunctionPass {
     // Only for debug
     DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg",
                     errs() << "    END doFinalization()\n");
+    BogusFinalBasicBlocksCounter =
+      BogusInitialBasicBlocksCounter + BogusAddedBasicBlocksCounter;
 
     return true;
   }

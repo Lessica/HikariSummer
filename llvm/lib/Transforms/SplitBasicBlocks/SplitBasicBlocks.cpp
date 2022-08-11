@@ -16,8 +16,8 @@ static cl::opt<unsigned> MaxSplitTimes(
   cl::Optional
 );
 
-STATISTIC(SplitCounter, "Counts number of the split operation");
-STATISTIC(SplittedBasicBlocksCounter, "Counts number of basic blocks split");
+STATISTIC(SplitInitialBasicBlocksCounter, "Initial number of basic blocks");
+STATISTIC(SplitFinalBasicBlocksCounter, "Final number of basic blocks");
 
 namespace {
 
@@ -32,9 +32,11 @@ struct SplitBasicBlocks : public FunctionPass {
     }
     std::vector<BasicBlock *> OriginalBasicBlock;
     for (BasicBlock &BB : F) {
+      SplitInitialBasicBlocksCounter++;
       OriginalBasicBlock.push_back(&BB);
     }
     for (BasicBlock *BB : OriginalBasicBlock) {
+      SplitFinalBasicBlocksCounter++;
       if (basicBlockContainsPHINode(BB) || BB->size() < 2) {
         continue;
       }
@@ -53,12 +55,11 @@ struct SplitBasicBlocks : public FunctionPass {
       for (Instruction &I : *CurrBB) {
         if (InstIdx++ == SplitSize) {
           CurrBB = CurrBB->splitBasicBlock(&I);
-          SplitCounter++;
+          SplitFinalBasicBlocksCounter++;
           break;
         }
       }
     }
-    SplittedBasicBlocksCounter++;
   }
 
   bool basicBlockContainsPHINode(BasicBlock *BB) {
