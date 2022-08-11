@@ -26,6 +26,10 @@ struct SplitBasicBlocks : public FunctionPass {
   SplitBasicBlocks() : FunctionPass(ID) {}
 
   bool runOnFunction(Function &F) override {
+    if (MaxSplitTimes > 10) {
+      errs() << "obfs-split-times should be less than 10\n";
+      return false;
+    }
     std::vector<BasicBlock *> OriginalBasicBlock;
     for (BasicBlock &BB : F) {
       OriginalBasicBlock.push_back(&BB);
@@ -57,7 +61,6 @@ struct SplitBasicBlocks : public FunctionPass {
     SplittedBasicBlocksCounter++;
   }
 
-  // Why PHI Node cannot be split?
   bool basicBlockContainsPHINode(BasicBlock *BB) {
     for (Instruction &I : *BB) {
       if (isa<PHINode>(&I)) {
@@ -72,4 +75,4 @@ struct SplitBasicBlocks : public FunctionPass {
 
 char SplitBasicBlocks::ID = 0;
 static RegisterPass<SplitBasicBlocks>
-    X(DEBUG_TYPE, "Split each basic block into several parts");
+  X(DEBUG_TYPE, "Split each basic block into several parts");
