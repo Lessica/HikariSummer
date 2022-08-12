@@ -18,7 +18,7 @@ using namespace llvm;
 #define DEBUG_TYPE "obfs-bcf"
 
 static cl::opt<unsigned> ProbabilityRate(
-  "obfs-bcf-prob", cl::NotHidden,
+  DEBUG_TYPE "-prob", cl::NotHidden,
   cl::desc("The probability (%) each basic block "
              "will be obfuscated by the obfs-bcf pass"),
   cl::init(70),
@@ -26,21 +26,21 @@ static cl::opt<unsigned> ProbabilityRate(
 );
 
 static cl::opt<unsigned> LoopTimes(
-  "obfs-bcf-loop", cl::NotHidden,
+  DEBUG_TYPE "-loop", cl::NotHidden,
   cl::desc("Number of times the obfs-bcf pass will loop on a function"),
   cl::init(1),
   cl::Optional
 );
 
 static cl::opt<unsigned> ConditionExpressionComplexity(
-  "obfs-bcf-cond-compl", cl::NotHidden,
+  DEBUG_TYPE "-cond-compl", cl::NotHidden,
   cl::desc("The complexity of the expression "
            "used to generate branching condition"),
   cl::init(3),
   cl::Optional
 );
 
-STATISTIC(BogusFunctionsCounter, "Number of functions");
+STATISTIC(BogusFunctionsCounter, "Number of functions with bogus control flow");
 STATISTIC(BogusInitialBasicBlocksCounter, "Initial number of basic blocks");
 STATISTIC(BogusProceededBasicBlocksCounter, "Number of proceeded basic blocks");
 STATISTIC(BogusModifiedBasicBlocksCounter, "Number of modified basic blocks");
@@ -721,4 +721,5 @@ struct BogusControlFlow : public FunctionPass {
 
 char BogusControlFlow::ID = 0;
 static RegisterPass<BogusControlFlow>
-  X(DEBUG_TYPE, "Enable Bogus Control Flow (BCF) obfuscation");
+  X(DEBUG_TYPE,
+    "Enable Bogus Control Flow (BCF) obfuscation");

@@ -10,7 +10,7 @@ using namespace llvm;
 #define DEBUG_TYPE "obfs-split"
 
 static cl::opt<unsigned> MaxSplitTimes(
-  "obfs-split-times", cl::NotHidden,
+  DEBUG_TYPE "-times", cl::NotHidden,
   cl::desc("Split each basic block into N parts"),
   cl::init(2),
   cl::Optional
