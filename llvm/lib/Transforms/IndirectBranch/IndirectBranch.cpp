@@ -14,6 +14,8 @@ using namespace llvm;
 
 #define DEBUG_TYPE "obfs-indbra"
 
+STATISTIC(AddedIndirectBranchCounter, "Number of added indirect branch instructions");
+
 namespace {
 
 struct IndirectBranch : public FunctionPass {
@@ -38,7 +40,7 @@ struct IndirectBranch : public FunctionPass {
     Constant *BlockAddrArr = ConstantArray::get(ArrTy, ArrayRef<Constant *>(BBs));
     GlobalVariable *BlockAddrArrGV = new GlobalVariable(
       M, ArrTy, false, GlobalVariable::LinkageTypes::InternalLinkage,
-      BlockAddrArr, "__obfs_indbra_GlobalTable");
+      BlockAddrArr, "ObfsIBGlobalTable");
     appendToCompilerUsed(M, {BlockAddrArrGV});
     return true;
   }
@@ -79,10 +81,10 @@ struct IndirectBranch : public FunctionPass {
         Constant *BlockAddrArr = ConstantArray::get(ArrTy, ArrayRef<Constant *>(BlockAddrs));
         LoadFrom = new GlobalVariable(
           *F.getParent(), ArrTy, false, GlobalVariable::LinkageTypes::PrivateLinkage,
-          BlockAddrArr, "__obfs_indbra_ConditionalTable");
+          BlockAddrArr, "ObfsIBConditionalTable");
         appendToCompilerUsed(*F.getParent(), {LoadFrom});
       } else {
-        LoadFrom = F.getParent()->getGlobalVariable("__obfs_indbra_GlobalTable", true);
+        LoadFrom = F.getParent()->getGlobalVariable("ObfsIBGlobalTable", true);
       }
 
       Value *Idx = NULL;
@@ -95,12 +97,14 @@ struct IndirectBranch : public FunctionPass {
       }
 
       Value *GEP = IRB.CreateGEP(LoadFrom, {ZeroVal, Idx});
-      LoadInst *LoadI = IRB.CreateLoad(GEP, "__obfs_indbra_TargetAddress");
+      LoadInst *LoadI = IRB.CreateLoad(GEP, "ObfsIBTargetAddress");
       IndirectBrInst *IndBrI = IndirectBrInst::Create(LoadI, BBs.size());
       for (BasicBlock *BB : BBs) {
         IndBrI->addDestination(BB);
       }
+
       ReplaceInstWithInst(BI, IndBrI);
+      AddedIndirectBranchCounter++;
     }
 
     return true;

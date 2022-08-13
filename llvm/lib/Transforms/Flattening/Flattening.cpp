@@ -85,7 +85,7 @@ struct Flattening : public FunctionPass {
         --Bi;
       }
 
-      BasicBlock *TmpBB = InsertBB->splitBasicBlock(Bi, "FirstBB");
+      BasicBlock *TmpBB = InsertBB->splitBasicBlock(Bi, "ObfsCFFFirstBB");
       OrigBBs.insert(OrigBBs.begin(), TmpBB);
     }
 
@@ -94,7 +94,7 @@ struct Flattening : public FunctionPass {
 
     // Create switch variable and set as it
     SwitchVar = new AllocaInst(Type::getInt32Ty(F->getContext()), 0,
-                               "SwitchVar", OldTerm);
+                               "ObfsCFFSwitchVar", OldTerm);
     OldTerm->eraseFromParent();
 
     new StoreInst(
@@ -103,10 +103,10 @@ struct Flattening : public FunctionPass {
       SwitchVar, InsertBB);
 
     // Create main loop entry
-    LoopEntryBB = BasicBlock::Create(F->getContext(), "LoopEntry", F, InsertBB);
-    LoopEndBB = BasicBlock::Create(F->getContext(), "LoopEnd", F, InsertBB);
+    LoopEntryBB = BasicBlock::Create(F->getContext(), "ObfsCFFLoopEntry", F, InsertBB);
+    LoopEndBB = BasicBlock::Create(F->getContext(), "ObfsCFFLoopEnd", F, InsertBB);
     LoadI = new LoadInst(SwitchVar->getType()->getElementType(), SwitchVar,
-                         "SwitchVar", LoopEntryBB);
+                         "ObfsCFFSwitchVar", LoopEntryBB);
 
     // Move first BB on top of the loop entry
     InsertBB->moveBefore(LoopEntryBB);
@@ -117,7 +117,7 @@ struct Flattening : public FunctionPass {
 
     // Create switch BB
     BasicBlock *SwitchDefaultBB =
-      BasicBlock::Create(F->getContext(), "SwitchDefault", F, LoopEndBB);
+      BasicBlock::Create(F->getContext(), "ObfsCFFSwitchDefault", F, LoopEndBB);
     BranchInst::Create(LoopEndBB, SwitchDefaultBB);
 
     // Create switch instruction

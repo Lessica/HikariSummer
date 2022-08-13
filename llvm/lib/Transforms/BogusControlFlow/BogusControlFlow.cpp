@@ -100,11 +100,11 @@ struct BogusControlFlow : public FunctionPass {
 
   bool runOnFunction(Function &F) override {
     if (LoopTimes == 0) {
-      errs() << "obfs-bcf-loop should be greater than 0\n";
+      errs() << DEBUG_TYPE "-loop should be greater than 0\n";
       return false;
     }
     if (ProbabilityRate > 100) {
-      errs() << "obfs-bcf-prob should be less than 100\n";
+      errs() << DEBUG_TYPE "-prob should be less than 100\n";
       return false;
     }
     doBogusOnFunction(F);
@@ -195,7 +195,7 @@ struct BogusControlFlow : public FunctionPass {
     if (InputBB->getFirstNonPHIOrDbgOrLifetime())
       I1 = (BasicBlock::iterator)InputBB->getFirstNonPHIOrDbgOrLifetime();
     Twine *Var;
-    Var = new Twine("OriginalBB");
+    Var = new Twine("ObfsBCFOriginalBB");
     BasicBlock *OriginalBB = InputBB->splitBasicBlock(I1, *Var);
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    First and original basic block: ok\n");
@@ -203,7 +203,7 @@ struct BogusControlFlow : public FunctionPass {
     BogusAddedBasicBlocksCounter++;
 
     // Creating the altered basic block on which the first basicBlock will jump to.
-    Twine *Var3 = new Twine("AlteredBB");
+    Twine *Var3 = new Twine("ObfsBCFAlteredBB");
     BasicBlock *AlteredBB = createAlteredBasicBlock(OriginalBB, *Var3, &F);
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    Altered basic block: ok\n");
@@ -229,7 +229,7 @@ struct BogusControlFlow : public FunctionPass {
 
     // The placeholder of an always true condition. End of the first block.
     ICmpInst *AlwaysTrueCondition =
-      new ICmpInst(*InputBB, ICmpInst::ICMP_EQ, LHS, RHS, "BCFPlaceholderPred");
+      new ICmpInst(*InputBB, ICmpInst::ICMP_EQ, LHS, RHS, "ObfsBCFPlaceholderPred");
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs() << "    Always true condition created\n");
 
     // Jump to the original basic block if the condition is true or
@@ -253,7 +253,7 @@ struct BogusControlFlow : public FunctionPass {
 
     // Split at this point.
     // We only want the terminator in the second part.
-    Twine *Var5 = new Twine("BCFOriginalBBPart2");
+    Twine *Var5 = new Twine("ObfsBCFOriginalBBPart2");
     BasicBlock *OriginalBBPart2 = OriginalBB->splitBasicBlock(--I, *Var5);
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    Terminator of the original basic block is isolated\n");
@@ -266,7 +266,7 @@ struct BogusControlFlow : public FunctionPass {
 
     // Add a new always true condition at the end.
     ICmpInst *AlwaysTrueCondition2 =
-      new ICmpInst(*OriginalBB, CmpInst::ICMP_EQ, LHS, RHS,"BCFPlaceholderPred");
+      new ICmpInst(*OriginalBB, CmpInst::ICMP_EQ, LHS, RHS,"ObfsBCFPlaceholderPred");
 
     // Do random behavior to avoid pattern recognition.
     // This is achieved by jumping to a random BB.
@@ -597,7 +597,7 @@ struct BogusControlFlow : public FunctionPass {
             unsigned Opcode = InstCmp->getOpcode();
             if (Opcode == Instruction::ICmp) {
               if (InstCmp->getPredicate() == ICmpInst::ICMP_EQ &&
-                  InstCmp->getName().startswith("BCFPlaceholderPred")) {
+                  InstCmp->getName().startswith("ObfsBCFPlaceholderPred")) {
                 DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                                 errs() << "    Found an always true predicate\n");
                 InstToDelete.push_back(InstCmp); // The condition
@@ -619,13 +619,13 @@ struct BogusControlFlow : public FunctionPass {
       // The return instruction is already returning constants
       // The variable names below are the artifact from the Emulation Era.
       Type *I32Ty = Type::getInt32Ty(M.getContext());
-      Module EmuModule("HikariBCFEmulator", M.getContext());
+      Module EmuModule("ObfsBCFEmulator", M.getContext());
       EmuModule.setDataLayout(M.getDataLayout());
       EmuModule.setTargetTriple(M.getTargetTriple());
       Function *EmuFunction =
         Function::Create(FunctionType::get(I32Ty, false),
                          GlobalValue::LinkageTypes::PrivateLinkage,
-                         "BeginExecution", &EmuModule);
+                         "ObfsBCFBeginExecution", &EmuModule);
       BasicBlock *EntryBlock =
         BasicBlock::Create(M.getContext(), "", EmuFunction);
 
@@ -654,17 +654,17 @@ struct BogusControlFlow : public FunctionPass {
       Instruction::BinaryOps InitialOp = Ops[llvm::SharedCryptoUtils->get_uint32_t() %
                                              (sizeof(Ops) / sizeof(Ops[0]))];
       Value *EmuLast =
-        IRBEmu.CreateBinOp(InitialOp, EmuLHS, EmuRHS, "EmuInitialCondition");
+        IRBEmu.CreateBinOp(InitialOp, EmuLHS, EmuRHS, "ObfsBCFEmuInitialCondition");
       Value *Last =
-        IRBReal.CreateBinOp(InitialOp, LHS, RHS, "InitialCondition");
+        IRBReal.CreateBinOp(InitialOp, LHS, RHS, "ObfsBCFInitialCondition");
       for (unsigned Ei = 0; Ei < ConditionExpressionComplexity; Ei++) {
         Constant *NewTmpConst = ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
         Instruction::BinaryOps ComplexInitialOp =
           Ops[llvm::SharedCryptoUtils->get_uint32_t() %
               (sizeof(Ops) / sizeof(Ops[0]))];
         EmuLast = IRBEmu.CreateBinOp(ComplexInitialOp, EmuLast, NewTmpConst,
-                                     "EmuInitialCondition");
-        Last = IRBReal.CreateBinOp(ComplexInitialOp, Last, NewTmpConst, "InitialCondition");
+                                     "ObfsBCFEmuInitialCondition");
+        Last = IRBReal.CreateBinOp(ComplexInitialOp, Last, NewTmpConst, "ObfsBCFInitialCondition");
       }
 
       // Randomly Generate Predicate
