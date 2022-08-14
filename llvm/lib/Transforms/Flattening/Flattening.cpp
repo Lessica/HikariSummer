@@ -13,7 +13,7 @@ using namespace llvm;
 
 #define DEBUG_TYPE "obfs-cff"
 
-STATISTIC(FlattenedFunctions, "Number of functions flattened");
+STATISTIC(FlattenedFunctionCounter, "Number of functions flattened");
 
 namespace {
 
@@ -60,7 +60,7 @@ struct Flattening : public FunctionPass {
       return false;
     }
 
-    FlattenedFunctions++;
+    FlattenedFunctionCounter++;
 
     // Remove the first BB
     OrigBBs.erase(OrigBBs.begin());

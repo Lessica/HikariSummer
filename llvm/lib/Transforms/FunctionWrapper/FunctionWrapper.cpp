@@ -30,6 +30,8 @@ static cl::opt<unsigned> LoopTimes(
   cl::Optional
 );
 
+STATISTIC(WrappedFunctionCounter, "Number of functions wrapped");
+
 namespace {
 
 struct FunctionWrapper : public ModulePass {
@@ -151,6 +153,8 @@ struct FunctionWrapper : public ModulePass {
 
     CB->setCalledFunction(Func);
     CB->mutateFunctionType(FuncTy);
+
+    WrappedFunctionCounter++;
 
     return CB;
   }
