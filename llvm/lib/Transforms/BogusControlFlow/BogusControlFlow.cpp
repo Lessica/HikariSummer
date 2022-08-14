@@ -63,9 +63,7 @@ namespace {
 
 struct BogusControlFlow : public FunctionPass {
   static char ID; // Pass identification, replacement for typeid
-  BogusControlFlow() : FunctionPass(ID) {
-    llvm::SharedCryptoUtils->prng_seed();
-  }
+  BogusControlFlow() : FunctionPass(ID) { }
 
   /// Shamefully stolen from IPO/StripSymbols.cpp
   /// OnlyUsedBy - Return true if V is only used by Usr.

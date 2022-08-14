@@ -32,7 +32,7 @@ struct StringEncryption : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
   std::map<Function * /* Function */, GlobalVariable * /* Decryption Status */>
     EncryptionStatus;
-  StringEncryption() : ModulePass(ID) { llvm::SharedCryptoUtils->prng_seed(); }
+  StringEncryption() : ModulePass(ID) { }
 
   bool runOnModule(Module &M) override {
     bool ModuleModified = false;

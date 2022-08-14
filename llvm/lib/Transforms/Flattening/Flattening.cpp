@@ -19,7 +19,7 @@ namespace {
 
 struct Flattening : public FunctionPass {
   static char ID; // Pass identification, replacement for typeid
-  Flattening() : FunctionPass(ID) { llvm::SharedCryptoUtils->prng_seed(); }
+  Flattening() : FunctionPass(ID) { }
 
   bool runOnFunction(Function &F) override { return doFlattening(&F); }
 

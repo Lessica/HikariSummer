@@ -36,9 +36,7 @@ namespace {
 
 struct FunctionWrapper : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
-  FunctionWrapper() : ModulePass(ID) {
-    llvm::SharedCryptoUtils->prng_seed();
-  }
+  FunctionWrapper() : ModulePass(ID) { }
 
   bool runOnModule(Module &M) override {
     if (LoopTimes == 0) {
