@@ -16,6 +16,7 @@ using namespace llvm;
 
 #define DEBUG_TYPE "obfs-acd"
 
+// FIXME: This option will cause +load failed to be called. Use with caution.
 static cl::opt<bool>
   UseInitialize(DEBUG_TYPE "-use-initialize", cl::NotHidden,
                 cl::desc("Inject codes to +initialize instead of +load"),
@@ -125,48 +126,84 @@ struct AntiClassDump : public ModulePass {
     return true;
   }
 
+  // Shamefully stolen from ../CodeGen/CGObjCMac.cpp
+  void replaceNonLazyClassList(Module &M, ArrayRef<GlobalValue *> Container) {
+    unsigned NumClasses = Container.size();
+    if (!NumClasses)
+      return;
+
+    Type *Int8PtrTy = Type::getInt8PtrTy(M.getContext());
+    SmallVector<Constant *, 8> Symbols(NumClasses);
+    for (unsigned Ci = 0; Ci < NumClasses; Ci++)
+      Symbols[Ci] = ConstantExpr::getBitCast(Container[Ci], Int8PtrTy);
+    Constant *Init =
+      ConstantArray::get(ArrayType::get(Int8PtrTy, Symbols.size()), Symbols);
+
+    GlobalVariable *OldGV =
+      M.getGlobalVariable("OBJC_LABEL_NONLAZY_CLASS_$", true);
+
+    GlobalVariable *GV =
+      new GlobalVariable(M, Init->getType(), false, GlobalValue::PrivateLinkage,
+                         Init, "OBJC_LABEL_NONLAZY_CLASS_$");
+    GV->setAlignment(
+      Align(M.getDataLayout().getABITypeAlignment(Init->getType())));
+    GV->setSection("__DATA,__objc_nlclslist,regular,no_dead_strip");
+
+    if (OldGV) {
+      OldGV->replaceAllUsesWith(ConstantExpr::getBitCast(GV, OldGV->getType()));
+      OldGV->dropAllReferences();
+      OldGV->eraseFromParent();
+    } else {
+      appendToCompilerUsed(M, {GV});
+    }
+  }
+
   bool runOnModule(Module &M) override {
 
-    GlobalVariable *ObjCLabelClsGV =
+    GlobalVariable *LabelClsGV =
       M.getGlobalVariable("OBJC_LABEL_CLASS_$", true);
-    if (ObjCLabelClsGV == NULL) {
+    if (LabelClsGV == NULL) {
       errs() << "No ObjC class found in: " << M.getSourceFileName() << "\n";
       return false;
     }
 
-    assert(ObjCLabelClsGV->hasInitializer() &&
+    assert(LabelClsGV->hasInitializer() &&
            "OBJC_LABEL_CLASS_$ does not have an initializer.");
-    ConstantArray *ObjCLabelClsCDS =
-      dyn_cast<ConstantArray>(ObjCLabelClsGV->getInitializer());
-    assert(ObjCLabelClsCDS &&
+    ConstantArray *LabelClsCDS =
+      dyn_cast<ConstantArray>(LabelClsGV->getInitializer());
+    assert(LabelClsCDS &&
            "OBJC_LABEL_CLASS_$ is not a ConstantArray. Is the target using "
            "unsupported legacy runtime?");
+
+    // Classes to be added to the non-lazy class list.
+    std::vector<GlobalValue *> NonLazyClsGVs;
 
     // This is for storing classes that can be used in handleClass().
     std::vector<std::string> RdyClsNames;
 
-    // This is temporary storage for classes.
+    // This is for storing classes not yet ready for use.
     std::deque<std::string> NotRdyClsNames;
 
+    // Map from class name to name of its super class.
     std::map<std::string /* Class */, std::string /* Super Class */> Cls2SupCls;
 
-    // Map class name to corresponding GV
+    // Map from class name to corresponding GV.
     std::map<std::string /* Class */, GlobalVariable *> ClsName2GV;
 
-    for (unsigned Ci = 0; Ci < ObjCLabelClsCDS->getNumOperands(); Ci++) {
+    for (unsigned Ci = 0; Ci < LabelClsCDS->getNumOperands(); Ci++) {
 
-      ConstantExpr *ClsCE =
-        dyn_cast<ConstantExpr>(ObjCLabelClsCDS->getOperand(Ci));
-      GlobalVariable *ClsCEGV = dyn_cast<GlobalVariable>(ClsCE->getOperand(0));
-      ConstantStruct *ClsCS =
-        dyn_cast<ConstantStruct>(ClsCEGV->getInitializer());
+      ConstantExpr *ClsCE = dyn_cast<ConstantExpr>(LabelClsCDS->getOperand(Ci));
+      GlobalVariable *ClsGV = dyn_cast<GlobalVariable>(ClsCE->getOperand(0));
+      NonLazyClsGVs.push_back(ClsGV);
+
+      ConstantStruct *ClsCS = dyn_cast<ConstantStruct>(ClsGV->getInitializer());
 
       GlobalVariable *SupClsGV =
         (ClsCS->getOperand(1) == NULL)
           ? NULL
           : dyn_cast<GlobalVariable>(ClsCS->getOperand(1));
 
-      std::string ClsName = ClsCEGV->getName().str();
+      std::string ClsName = ClsGV->getName().str();
       ClsName.replace(ClsName.find("OBJC_CLASS_$_"),
                       sizeof("OBJC_CLASS_$_") - 1,
                       ""); // remove OBJC_CLASS_$_ prefix
@@ -181,7 +218,7 @@ struct AntiClassDump : public ModulePass {
       }
 
       Cls2SupCls[ClsName] = SupClsName;
-      ClsName2GV[ClsName] = ClsCEGV;
+      ClsName2GV[ClsName] = ClsGV;
 
       if (SupClsName.empty() /* NULL Super Class */ ||
           (SupClsGV != NULL &&
@@ -214,6 +251,11 @@ struct AntiClassDump : public ModulePass {
     // Now run handleClass() for each class.
     for (std::string ReadyClsName : RdyClsNames) {
       handleClass(ClsName2GV[ReadyClsName], &M);
+    }
+
+    // Add the non-lazy class list.
+    if (!UseInitialize) {
+      replaceNonLazyClassList(M, ArrayRef<GlobalValue *>(NonLazyClsGVs));
     }
 
     return true;
