@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="opt-bcf" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-load LLVMCryptoUtils.dylib -load LLVMSplitBasicBlocks.dylib -load LLVMBogusControlFlow.dylib -obfs-split -obfs-split-times 4 -obfs-bcf -obfs-bcf-loop 4" REDIRECT_INPUT="true" REDIRECT_INPUT_PATH="tbdump.bc" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://.." PASS_PARENT_ENVS_2="true" PROJECT_NAME="LLVM" TARGET_NAME="opt" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="LLVM" RUN_TARGET_NAME="opt">
+    <method v="2">
+      <option name="CMake.Explicit.Target" predefinedTargetName="LLVMCryptoUtils" />
+      <option name="CMake.Explicit.Target" predefinedTargetName="LLVMSplitBasicBlocks" />
+      <option name="CMake.Explicit.Target" predefinedTargetName="LLVMBogusControlFlow" />
+      <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>
