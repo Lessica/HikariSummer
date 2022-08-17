@@ -4,7 +4,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 
-#define STRINGENCRYPTION_PASS_DESCRIPTION "Enable string encryption"
+#define STRINGENCRYPTION_PASS_DESCRIPTION "Enable String Encryption obfuscation"
 
 using namespace llvm;
 

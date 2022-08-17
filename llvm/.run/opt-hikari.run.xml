@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="opt-hikari" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-debug -load LLVMHikariObfuscator.dylib -obfs" REDIRECT_INPUT="false" REDIRECT_INPUT_PATH="tbdump.bc" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://.." PASS_PARENT_ENVS_2="true" PROJECT_NAME="LLVM" TARGET_NAME="opt" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="LLVM" RUN_TARGET_NAME="opt">
+    <method v="2">
+      <option name="CMake.Explicit.Target" predefinedTargetName="LLVMHikariObfuscator" />
+      <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>

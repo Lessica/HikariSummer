@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="opt-indbra" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-load LLVMIndirectBranch.dylib -obfs-indbra" REDIRECT_INPUT="true" REDIRECT_INPUT_PATH="tbdump.bc" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://.." PASS_PARENT_ENVS_2="true" PROJECT_NAME="LLVM" TARGET_NAME="opt" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="LLVM" RUN_TARGET_NAME="opt">
+  <configuration default="false" name="opt-indbra" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-debug -load LLVMIndirectBranch.dylib -obfs-indbra" REDIRECT_INPUT="true" REDIRECT_INPUT_PATH="tbdump.bc" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://.." PASS_PARENT_ENVS_2="true" PROJECT_NAME="LLVM" TARGET_NAME="opt" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="LLVM" RUN_TARGET_NAME="opt">
     <method v="2">
       <option name="CMake.Explicit.Target" predefinedTargetName="LLVMIndirectBranch" />
       <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />

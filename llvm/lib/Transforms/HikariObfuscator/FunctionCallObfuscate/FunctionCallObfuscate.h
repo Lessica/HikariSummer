@@ -5,7 +5,7 @@
 #include "llvm/Pass.h"
 
 #define FUNCTIONCALLOBFUSCATE_PASS_DESCRIPTION                                 \
-  "Enable function call obfuscation"
+  "Enable Function Call obfuscation"
 
 using namespace llvm;
 

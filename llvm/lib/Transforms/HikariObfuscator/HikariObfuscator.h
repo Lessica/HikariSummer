@@ -8,8 +8,8 @@ using namespace llvm;
 
 namespace llvm {
 
-ModulePass *createHikariPass();
-void initializeHikariPass(PassRegistry &Registry);
+ModulePass *createHikariObfuscatorPass();
+void initializeHikariObfuscatorPass(PassRegistry &Registry);
 
 } // namespace llvm
 

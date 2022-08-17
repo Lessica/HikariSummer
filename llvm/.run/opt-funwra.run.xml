@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="opt-funwra" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-load LLVMFunctionWrapper.dylib -obfs-funwra" REDIRECT_INPUT="true" REDIRECT_INPUT_PATH="tbdump.bc" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://.." PASS_PARENT_ENVS_2="true" PROJECT_NAME="LLVM" TARGET_NAME="opt" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="LLVM" RUN_TARGET_NAME="opt">
+  <configuration default="false" name="opt-funwra" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-debug -load LLVMCryptoUtils.dylib -load LLVMFunctionWrapper.dylib -obfs-funwra" REDIRECT_INPUT="true" REDIRECT_INPUT_PATH="tbdump.bc" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://.." PASS_PARENT_ENVS_2="true" PROJECT_NAME="LLVM" TARGET_NAME="opt" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="LLVM" RUN_TARGET_NAME="opt">
     <method v="2">
       <option name="CMake.Explicit.Target" predefinedTargetName="LLVMCryptoUtils" />
       <option name="CMake.Explicit.Target" predefinedTargetName="LLVMFunctionWrapper" />
