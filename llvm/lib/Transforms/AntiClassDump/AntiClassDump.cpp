@@ -37,7 +37,7 @@ struct AntiClassDump : public ModulePass {
     Triple Tri(M.getTargetTriple());
     if (Tri.getVendor() != Triple::VendorType::Apple) {
       errs() << M.getTargetTriple()
-             << " is not supported by obfs-acd.\nProbably GNU Step?\n";
+             << " is not supported by " DEBUG_TYPE ".\nProbably GNU Step?\n";
       return false;
     }
 
