@@ -1,11 +1,13 @@
+#include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/NoFolder.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/CryptoUtils.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <map>
@@ -32,7 +34,7 @@ struct StringEncryption : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
   std::map<Function * /* Function */, GlobalVariable * /* Decryption Status */>
     EncryptionStatus;
-  StringEncryption() : ModulePass(ID) { }
+  StringEncryption() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override {
     bool ModuleModified = false;
@@ -461,6 +463,20 @@ struct StringEncryption : public ModulePass {
 } // namespace
 
 char StringEncryption::ID = 0;
-static RegisterPass<StringEncryption>
-  X(DEBUG_TYPE,
-    "Enable string encryption");
+
+#define PASS_DESCRIPTION "Enable string encryption"
+
+// Register to opt
+static RegisterPass<StringEncryption> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-strcry", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new StringEncryption());
+                                  }
+                                });

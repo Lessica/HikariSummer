@@ -2,10 +2,12 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/NoFolder.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include <fstream>
 
 using namespace llvm;
@@ -347,5 +349,20 @@ struct FunctionCallObfuscate : public FunctionPass {
 } // namespace
 
 char FunctionCallObfuscate::ID = 0;
-static RegisterPass<FunctionCallObfuscate>
-  X(DEBUG_TYPE, "Enable function call obfuscation");
+
+#define PASS_DESCRIPTION "Enable function call obfuscation"
+
+// Register to opt
+static RegisterPass<FunctionCallObfuscate> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-fco", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new FunctionCallObfuscate());
+                                  }
+                                });

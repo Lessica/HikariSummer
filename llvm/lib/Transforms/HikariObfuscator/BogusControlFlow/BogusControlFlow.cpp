@@ -1,12 +1,14 @@
+#include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/CryptoUtils.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -17,28 +19,22 @@ using namespace llvm;
 
 #define DEBUG_TYPE "obfs-bcf"
 
-static cl::opt<unsigned> ProbabilityRate(
-  DEBUG_TYPE "-prob", cl::NotHidden,
-  cl::desc("The probability (%) each basic block "
-             "will be obfuscated by the obfs-bcf pass"),
-  cl::init(70),
-  cl::Optional
-);
+static cl::opt<unsigned>
+  ProbabilityRate(DEBUG_TYPE "-prob", cl::NotHidden,
+                  cl::desc("The probability (%) each basic block "
+                           "will be obfuscated by the obfs-bcf pass"),
+                  cl::init(70), cl::Optional);
 
 static cl::opt<unsigned> LoopTimes(
   DEBUG_TYPE "-loop", cl::NotHidden,
   cl::desc("Number of times the obfs-bcf pass will loop on a function"),
-  cl::init(1),
-  cl::Optional
-);
+  cl::init(1), cl::Optional);
 
 static cl::opt<unsigned> ConditionExpressionComplexity(
   DEBUG_TYPE "-cond-compl", cl::NotHidden,
   cl::desc("The complexity of the expression "
            "used to generate branching condition"),
-  cl::init(3),
-  cl::Optional
-);
+  cl::init(3), cl::Optional);
 
 STATISTIC(BogusFunctionsCounter, "Number of functions with bogus control flow");
 STATISTIC(BogusInitialBasicBlocksCounter, "Initial number of basic blocks");
@@ -47,23 +43,19 @@ STATISTIC(BogusModifiedBasicBlocksCounter, "Number of modified basic blocks");
 STATISTIC(BogusAddedBasicBlocksCounter, "Number of added basic blocks");
 STATISTIC(BogusFinalBasicBlocksCounter, "Final number of basic blocks");
 
-static Instruction::BinaryOps Ops[] = {
-  Instruction::Add, Instruction::Sub,
-  Instruction::And, Instruction::Or,
-  Instruction::Xor
-};
+static Instruction::BinaryOps Ops[] = {Instruction::Add, Instruction::Sub,
+                                       Instruction::And, Instruction::Or,
+                                       Instruction::Xor};
 
-static CmpInst::Predicate Preds[] = {
-  CmpInst::ICMP_EQ,  CmpInst::ICMP_NE,
-  CmpInst::ICMP_UGT, CmpInst::ICMP_UGE,
-  CmpInst::ICMP_ULT, CmpInst::ICMP_ULE
-};
+static CmpInst::Predicate Preds[] = {CmpInst::ICMP_EQ,  CmpInst::ICMP_NE,
+                                     CmpInst::ICMP_UGT, CmpInst::ICMP_UGE,
+                                     CmpInst::ICMP_ULT, CmpInst::ICMP_ULE};
 
 namespace {
 
 struct BogusControlFlow : public FunctionPass {
   static char ID; // Pass identification, replacement for typeid
-  BogusControlFlow() : FunctionPass(ID) { }
+  BogusControlFlow() : FunctionPass(ID) {}
 
   /// Shamefully stolen from IPO/StripSymbols.cpp
   /// OnlyUsedBy - Return true if V is only used by Usr.
@@ -77,12 +69,13 @@ struct BogusControlFlow : public FunctionPass {
 
   void removeDeadConstant(Constant *C) { // NOLINT(misc-no-recursion)
     assert(C->use_empty() && "Constant is not dead!");
-    SmallPtrSet<Constant*, 4> Operands;
+    SmallPtrSet<Constant *, 4> Operands;
     for (Value *Op : C->operands())
       if (onlyUsedBy(Op, C))
         Operands.insert(cast<Constant>(Op));
     if (GlobalVariable *GV = dyn_cast<GlobalVariable>(C)) {
-      if (!GV->hasLocalLinkage()) return;   // Don't delete non-static globals.
+      if (!GV->hasLocalLinkage())
+        return; // Don't delete non-static globals.
       GV->eraseFromParent();
     } else if (!isa<Function>(C)) {
       // FIXME: Why does the type of the constant matter here?
@@ -114,10 +107,10 @@ struct BogusControlFlow : public FunctionPass {
     BogusFunctionsCounter++;
     bool HasBeenModified = false;
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
-                    errs() << "Running obfs-bcf on function " << F.getName() << "\n");
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
-                    errs() << "  Probability rate: " << ProbabilityRate << "%\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-opt", errs() << "Running obfs-bcf on function "
+                                              << F.getName() << "\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-opt", errs() << "  Probability rate: "
+                                              << ProbabilityRate << "%\n");
     DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
                     errs() << "  Loop times: " << LoopTimes << "\n");
 
@@ -126,42 +119,53 @@ struct BogusControlFlow : public FunctionPass {
 
       int LoopIndex = LoopTimes - NumLoopTimes + 1;
       DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg",
-                      errs() << "CFG of function " << F.getName() << " before loop #" << LoopIndex << ": \n");
+                      errs() << "CFG of function " << F.getName()
+                             << " before loop #" << LoopIndex << ": \n");
       DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg", F.viewCFG());
 
       std::list<BasicBlock *> BasicBlocks;
       for (BasicBlock &BB : F) {
         BogusInitialBasicBlocksCounter++;
-        if (!BB.isEHPad() && !BB.isLandingPad() && !basicBlockContainsInlineAsm(BB))
+        if (!BB.isEHPad() && !BB.isLandingPad() &&
+            !basicBlockContainsInlineAsm(BB))
           BasicBlocks.push_back(&BB);
       }
 
       DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                      errs() << "  Iterating on the basic blocks of function " << F.getName() << "\n");
+                      errs() << "  Iterating on the basic blocks of function "
+                             << F.getName() << "\n");
       while (!BasicBlocks.empty()) {
         BogusProceededBasicBlocksCounter++;
         if (llvm::SharedCryptoUtils->get_range(100) < ProbabilityRate) {
           DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
-                          errs() << "    Obfuscating basic block #" << BogusProceededBasicBlocksCounter << "\n");
+                          errs() << "    Obfuscating basic block #"
+                                 << BogusProceededBasicBlocksCounter << "\n");
           addBogusFlow(BasicBlocks.front(), F);
           HasBeenModified = true;
         } else {
           DEBUG_WITH_TYPE(DEBUG_TYPE "-opt",
-                          errs() << "    Skipping basic block #" << BogusProceededBasicBlocksCounter << "\n");
+                          errs() << "    Skipping basic block #"
+                                 << BogusProceededBasicBlocksCounter << "\n");
         }
         BasicBlocks.pop_front();
       }
-      DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg",
-                      errs() << "  Finished obfuscating the basic blocks of function " << F.getName() << "\n");
+      DEBUG_WITH_TYPE(
+        DEBUG_TYPE "-cfg",
+        errs() << "  Finished obfuscating the basic blocks of function "
+               << F.getName() << "\n");
 
       if (HasBeenModified) {
         DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg",
-                        errs() << "  Function " << F.getName() << " has been modified during loop #" << LoopIndex << "\n");
+                        errs() << "  Function " << F.getName()
+                               << " has been modified during loop #"
+                               << LoopIndex << "\n");
         DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg", F.viewCFG());
         HasBeenModified = false;
       } else {
         DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg",
-                        errs() << "  Function " << F.getName() << " has not been modified during loop #" << LoopIndex << "\n");
+                        errs() << "  Function " << F.getName()
+                               << " has not been modified during loop #"
+                               << LoopIndex << "\n");
       }
     } while (--NumLoopTimes);
   }
@@ -200,11 +204,12 @@ struct BogusControlFlow : public FunctionPass {
 
     BogusAddedBasicBlocksCounter++;
 
-    // Creating the altered basic block on which the first basicBlock will jump to.
+    // Creating the altered basic block on which the first basicBlock will jump
+    // to.
     Twine *Var3 = new Twine("ObfsBCFAlteredBB");
     BasicBlock *AlteredBB = createAlteredBasicBlock(OriginalBB, *Var3, &F);
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                    errs() << "    Altered basic block: ok\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs()
+                                         << "    Altered basic block: ok\n");
 
     BogusAddedBasicBlocksCounter++;
 
@@ -212,27 +217,32 @@ struct BogusControlFlow : public FunctionPass {
     // we modify the terminators to adjust the control flow.
     AlteredBB->getTerminator()->eraseFromParent();
     InputBB->getTerminator()->eraseFromParent();
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                    errs() << "    Terminator removed from the altered and first basic block\n");
+    DEBUG_WITH_TYPE(
+      DEBUG_TYPE "-gen",
+      errs()
+        << "    Terminator removed from the altered and first basic block\n");
 
     // Preparing a condition.
     // For now, the condition is an always true comparison between 2 float.
     // This will be complicated after the pass (in doFinalization()).
 
-    // We need to use ConstantInt instead of ConstantFP as ConstantFP results in strange dead-loop
-    // when injected into Xcode.
+    // We need to use ConstantInt instead of ConstantFP as ConstantFP results in
+    // strange dead-loop when injected into Xcode.
     Value *LHS = ConstantInt::get(Type::getInt32Ty(F.getContext()), 1);
     Value *RHS = ConstantInt::get(Type::getInt32Ty(F.getContext()), 1);
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs() << "    Value LHS and RHS created\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs()
+                                         << "    Value LHS and RHS created\n");
 
     // The placeholder of an always true condition. End of the first block.
-    ICmpInst *AlwaysTrueCondition =
-      new ICmpInst(*InputBB, ICmpInst::ICMP_EQ, LHS, RHS, "ObfsBCFPlaceholderPred");
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs() << "    Always true condition created\n");
+    ICmpInst *AlwaysTrueCondition = new ICmpInst(
+      *InputBB, ICmpInst::ICMP_EQ, LHS, RHS, "ObfsBCFPlaceholderPred");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
+                    errs() << "    Always true condition created\n");
 
     // Jump to the original basic block if the condition is true or
     // to the altered block if false.
-    BranchInst::Create(OriginalBB, AlteredBB, (Value *)AlwaysTrueCondition, InputBB);
+    BranchInst::Create(OriginalBB, AlteredBB, (Value *)AlwaysTrueCondition,
+                       InputBB);
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    Terminator in first basic block: ok\n");
 
@@ -253,8 +263,9 @@ struct BogusControlFlow : public FunctionPass {
     // We only want the terminator in the second part.
     Twine *Var5 = new Twine("ObfsBCFOriginalBBPart2");
     BasicBlock *OriginalBBPart2 = OriginalBB->splitBasicBlock(--I, *Var5);
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                    errs() << "    Terminator of the original basic block is isolated\n");
+    DEBUG_WITH_TYPE(
+      DEBUG_TYPE "-gen",
+      errs() << "    Terminator of the original basic block is isolated\n");
 
     BogusAddedBasicBlocksCounter++;
 
@@ -263,8 +274,8 @@ struct BogusControlFlow : public FunctionPass {
     OriginalBB->getTerminator()->eraseFromParent();
 
     // Add a new always true condition at the end.
-    ICmpInst *AlwaysTrueCondition2 =
-      new ICmpInst(*OriginalBB, CmpInst::ICMP_EQ, LHS, RHS,"ObfsBCFPlaceholderPred");
+    ICmpInst *AlwaysTrueCondition2 = new ICmpInst(
+      *OriginalBB, CmpInst::ICMP_EQ, LHS, RHS, "ObfsBCFPlaceholderPred");
 
     // Do random behavior to avoid pattern recognition.
     // This is achieved by jumping to a random BB.
@@ -283,8 +294,7 @@ struct BogusControlFlow : public FunctionPass {
 
     DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
                     errs() << "    Terminator in original basic block: ok\n");
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                    errs() << "    END addBogusFlow()\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs() << "    END addBogusFlow()\n");
   }
 
   /* This function return a basic block similar to a given one.
@@ -294,7 +304,9 @@ struct BogusControlFlow : public FunctionPass {
    * debug locations are adjusted to fit in the cloned basic block and
    * behave nicely.
    */
-  BasicBlock *createAlteredBasicBlock(BasicBlock *InputBB, const Twine &Name = "gen", Function *F = nullptr) {
+  BasicBlock *createAlteredBasicBlock(BasicBlock *InputBB,
+                                      const Twine &Name = "gen",
+                                      Function *F = nullptr) {
 
     // Useful to remap the information concerning instructions
     ValueToValueMapTy VMap;
@@ -308,7 +320,8 @@ struct BogusControlFlow : public FunctionPass {
          Ai != Ae; ++Ai) {
 
       // Loop over the operands of the instruction
-      for (User::op_iterator Oi = Ai->op_begin(), Oe = Ai->op_end(); Oi != Oe; ++Oi) {
+      for (User::op_iterator Oi = Ai->op_begin(), Oe = Ai->op_end(); Oi != Oe;
+           ++Oi) {
 
         // Get the value for the operand
         Value *V = MapValue(*Oi, VMap, RF_None, 0);
@@ -318,8 +331,7 @@ struct BogusControlFlow : public FunctionPass {
                           errs() << "      Operand of value set\n");
         }
       }
-      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                      errs() << "      Operands remapped\n");
+      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs() << "      Operands remapped\n");
 
       // Remap phi nodes' incoming blocks.
       if (PHINode *Pn = dyn_cast<PHINode>(Ai)) {
@@ -330,14 +342,13 @@ struct BogusControlFlow : public FunctionPass {
           }
         }
       }
-      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                      errs() << "      PHI nodes remapped\n");
+      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs()
+                                           << "      PHI nodes remapped\n");
 
       // Remap attached metadata
       SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
       Ai->getAllMetadata(MDs);
-      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                      errs() << "      Metadata remapped\n");
+      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs() << "      Metadata remapped\n");
 
       // Important for compiling with DWARF, using option -g.
       Ai->setDebugLoc(Ji->getDebugLoc());
@@ -368,16 +379,15 @@ struct BogusControlFlow : public FunctionPass {
 
         // Treat differently Float or Int
         // Binary Int
-        if (Opcode == Instruction::Add  || Opcode == Instruction::Sub  ||
-            Opcode == Instruction::Mul  || Opcode == Instruction::UDiv ||
+        if (Opcode == Instruction::Add || Opcode == Instruction::Sub ||
+            Opcode == Instruction::Mul || Opcode == Instruction::UDiv ||
             Opcode == Instruction::SDiv || Opcode == Instruction::URem ||
-            Opcode == Instruction::SRem || Opcode == Instruction::Shl  ||
+            Opcode == Instruction::SRem || Opcode == Instruction::Shl ||
             Opcode == Instruction::LShr || Opcode == Instruction::AShr ||
-            Opcode == Instruction::And  || Opcode == Instruction::Or   ||
-            Opcode == Instruction::Xor)
-        {
-          for (int Ri = (int)llvm::SharedCryptoUtils->get_range(10); Ri < 10; ++Ri)
-          {
+            Opcode == Instruction::And || Opcode == Instruction::Or ||
+            Opcode == Instruction::Xor) {
+          for (int Ri = (int)llvm::SharedCryptoUtils->get_range(10); Ri < 10;
+               ++Ri) {
             switch (llvm::SharedCryptoUtils->get_range(4)) {
             case 0:
               break;
@@ -403,10 +413,9 @@ struct BogusControlFlow : public FunctionPass {
         // Binary Float
         if (Opcode == Instruction::FAdd || Opcode == Instruction::FSub ||
             Opcode == Instruction::FMul || Opcode == Instruction::FDiv ||
-            Opcode == Instruction::FRem)
-        {
-          for (int Ri = (int)llvm::SharedCryptoUtils->get_range(10); Ri < 10; ++Ri)
-          {
+            Opcode == Instruction::FRem) {
+          for (int Ri = (int)llvm::SharedCryptoUtils->get_range(10); Ri < 10;
+               ++Ri) {
             switch (llvm::SharedCryptoUtils->get_range(3)) {
             case 0:
               break;
@@ -578,8 +587,8 @@ struct BogusControlFlow : public FunctionPass {
     // A better way to obfuscate the predicates would be welcome.
     // In the meantime we will erase the name of the basic blocks,
     // the instructions and the functions.
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                    errs() << "Starting doFinalization()...\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs()
+                                         << "Starting doFinalization()...\n");
 
     std::vector<Instruction *> InstToEdit, InstToDelete;
 
@@ -597,9 +606,11 @@ struct BogusControlFlow : public FunctionPass {
               if (InstCmp->getPredicate() == ICmpInst::ICMP_EQ &&
                   InstCmp->getName().startswith("ObfsBCFPlaceholderPred")) {
                 DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                                errs() << "    Found an always true predicate\n");
+                                errs()
+                                  << "    Found an always true predicate\n");
                 InstToDelete.push_back(InstCmp); // The condition
-                InstToEdit.push_back(InstTerm); // The branch using the condition
+                InstToEdit.push_back(
+                  InstTerm); // The branch using the condition
               }
             }
           }
@@ -610,8 +621,7 @@ struct BogusControlFlow : public FunctionPass {
     // Replacing all the branches we found
     for (std::vector<Instruction *>::iterator Ii = InstToEdit.begin(),
                                               Ie = InstToEdit.end();
-         Ii != Ie; ++Ii)
-    {
+         Ii != Ie; ++Ii) {
       // Previously We Use LLVM EE To Calculate LHS and RHS.
       // Since IRBuilder<> uses ConstantFolding to fold constants.
       // The return instruction is already returning constants
@@ -632,11 +642,14 @@ struct BogusControlFlow : public FunctionPass {
       IRBuilder<> IRBEmu(EntryBlock);
 
       // First, construct a real RHS that will be used in the actual condition
-      Constant *RealRHS = ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
+      Constant *RealRHS =
+        ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
 
       // Prepare initial LHS and RHS to bootstrap the emulator
-      Constant *LHSC = ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
-      Constant *RHSC = ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
+      Constant *LHSC =
+        ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
+      Constant *RHSC =
+        ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
       GlobalVariable *LHSGV =
         new GlobalVariable(M, Type::getInt32Ty(M.getContext()), false,
                            GlobalValue::PrivateLinkage, LHSC, "LHSGV");
@@ -649,20 +662,23 @@ struct BogusControlFlow : public FunctionPass {
       // To speed up evaluation
       Value *EmuLHS = LHSC;
       Value *EmuRHS = RHSC;
-      Instruction::BinaryOps InitialOp = Ops[llvm::SharedCryptoUtils->get_uint32_t() %
-                                             (sizeof(Ops) / sizeof(Ops[0]))];
-      Value *EmuLast =
-        IRBEmu.CreateBinOp(InitialOp, EmuLHS, EmuRHS, "ObfsBCFEmuInitialCondition");
+      Instruction::BinaryOps InitialOp =
+        Ops[llvm::SharedCryptoUtils->get_uint32_t() %
+            (sizeof(Ops) / sizeof(Ops[0]))];
+      Value *EmuLast = IRBEmu.CreateBinOp(InitialOp, EmuLHS, EmuRHS,
+                                          "ObfsBCFEmuInitialCondition");
       Value *Last =
         IRBReal.CreateBinOp(InitialOp, LHS, RHS, "ObfsBCFInitialCondition");
       for (unsigned Ei = 0; Ei < ConditionExpressionComplexity; Ei++) {
-        Constant *NewTmpConst = ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
+        Constant *NewTmpConst =
+          ConstantInt::get(I32Ty, llvm::SharedCryptoUtils->get_uint32_t());
         Instruction::BinaryOps ComplexInitialOp =
           Ops[llvm::SharedCryptoUtils->get_uint32_t() %
               (sizeof(Ops) / sizeof(Ops[0]))];
         EmuLast = IRBEmu.CreateBinOp(ComplexInitialOp, EmuLast, NewTmpConst,
                                      "ObfsBCFEmuInitialCondition");
-        Last = IRBReal.CreateBinOp(ComplexInitialOp, Last, NewTmpConst, "ObfsBCFInitialCondition");
+        Last = IRBReal.CreateBinOp(ComplexInitialOp, Last, NewTmpConst,
+                                   "ObfsBCFInitialCondition");
       }
 
       // Randomly Generate Predicate
@@ -690,24 +706,24 @@ struct BogusControlFlow : public FunctionPass {
 
       EntryBlock->eraseFromParent();
       EmuFunction->eraseFromParent();
-      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                      errs() << "    Erase branch instruction: " << *((BranchInst *)*Ii) << "\n");
+      DEBUG_WITH_TYPE(DEBUG_TYPE "-gen", errs()
+                                           << "    Erase branch instruction: "
+                                           << *((BranchInst *)*Ii) << "\n");
       (*Ii)->eraseFromParent(); // erase the branch
     }
 
     // Erase all the associated conditions we found
     for (std::vector<Instruction *>::iterator Ii = InstToDelete.begin(),
                                               Ie = InstToDelete.end();
-         Ii != Ie; ++Ii)
-    {
+         Ii != Ie; ++Ii) {
       DEBUG_WITH_TYPE(DEBUG_TYPE "-gen",
-                      errs() << "    Erase condition instruction: " << *((Instruction *)*Ii) << "\n");
+                      errs() << "    Erase condition instruction: "
+                             << *((Instruction *)*Ii) << "\n");
       (*Ii)->eraseFromParent();
     }
 
     // Only for debug
-    DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg",
-                    errs() << "    END doFinalization()\n");
+    DEBUG_WITH_TYPE(DEBUG_TYPE "-cfg", errs() << "    END doFinalization()\n");
     BogusFinalBasicBlocksCounter =
       BogusInitialBasicBlocksCounter + BogusAddedBasicBlocksCounter;
 
@@ -718,6 +734,20 @@ struct BogusControlFlow : public FunctionPass {
 } // namespace
 
 char BogusControlFlow::ID = 0;
-static RegisterPass<BogusControlFlow>
-  X(DEBUG_TYPE,
-    "Enable Bogus Control Flow (BCF) obfuscation");
+
+#define PASS_DESCRIPTION "Enable Bogus Control Flow (BCF) obfuscation"
+
+// Register to opt
+static RegisterPass<BogusControlFlow> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-bcfobf", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new BogusControlFlow());
+                                  }
+                                });

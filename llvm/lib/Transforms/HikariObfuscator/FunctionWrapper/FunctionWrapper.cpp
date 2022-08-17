@@ -1,13 +1,15 @@
+#include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/CryptoUtils.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
@@ -19,16 +21,12 @@ static cl::opt<unsigned> ProbabilityRate(
   cl::desc(
     "The probability (%) each call site will be obfuscated by the " DEBUG_TYPE
     " pass"),
-  cl::init(70),
-  cl::Optional
-);
+  cl::init(70), cl::Optional);
 
-static cl::opt<unsigned> LoopTimes(
-  DEBUG_TYPE "-loop", cl::NotHidden,
-  cl::desc("Number of times the " DEBUG_TYPE " pass will loop on a call site"),
-  cl::init(1),
-  cl::Optional
-);
+static cl::opt<unsigned> LoopTimes(DEBUG_TYPE "-loop", cl::NotHidden,
+                                   cl::desc("Number of times the " DEBUG_TYPE
+                                            " pass will loop on a call site"),
+                                   cl::init(1), cl::Optional);
 
 STATISTIC(WrappedFunctionCounter, "Number of functions wrapped");
 
@@ -36,7 +34,7 @@ namespace {
 
 struct FunctionWrapper : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
-  FunctionWrapper() : ModulePass(ID) { }
+  FunctionWrapper() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override {
     if (LoopTimes == 0) {
@@ -49,9 +47,8 @@ struct FunctionWrapper : public ModulePass {
     }
     std::vector<CallBase *> CallBases;
     for (Function &F : M) {
-      for (inst_iterator Fi = inst_begin(&F), Fe = inst_end(&F);
-           Fi != Fe; Fi++)
-      {
+      for (inst_iterator Fi = inst_begin(&F), Fe = inst_end(&F); Fi != Fe;
+           Fi++) {
         Instruction *FuncInst = &*Fi;
         if (isa<CallInst>(FuncInst) || isa<InvokeInst>(FuncInst)) {
           if (llvm::SharedCryptoUtils->get_range(100) <= ProbabilityRate) {
@@ -83,8 +80,7 @@ struct FunctionWrapper : public ModulePass {
     if (CalledFunction == nullptr ||
         (!isa<ConstantExpr>(CalledFunction) &&
          !isa<Function>(CalledFunction)) ||
-        CB->getIntrinsicID() != Intrinsic::not_intrinsic)
-    {
+        CB->getIntrinsicID() != Intrinsic::not_intrinsic) {
       return nullptr;
     }
 
@@ -94,8 +90,7 @@ struct FunctionWrapper : public ModulePass {
       }
       for (Argument *ArgIter = FuncTmp->arg_begin(),
                     *ArgEnd = FuncTmp->arg_end();
-           ArgIter != ArgEnd; ++ArgIter)
-      {
+           ArgIter != ArgEnd; ++ArgIter) {
         Argument &Arg = *(ArgIter);
         if (Arg.hasByValAttr()) {
 
@@ -133,8 +128,7 @@ struct FunctionWrapper : public ModulePass {
 
     std::vector<Value *> Params;
     for (Argument *Arg = Func->arg_begin(), *ArgEnd = Func->arg_end();
-         Arg != ArgEnd; Arg++)
-    {
+         Arg != ArgEnd; Arg++) {
       Params.push_back(Arg);
     }
 
@@ -161,6 +155,20 @@ struct FunctionWrapper : public ModulePass {
 } // namespace
 
 char FunctionWrapper::ID = 0;
-static RegisterPass<FunctionWrapper>
-  X(DEBUG_TYPE,
-    "Enable Function Wrapper obfuscation");
+
+#define PASS_DESCRIPTION "Enable Function Wrapper obfuscation"
+
+// Register to opt
+static RegisterPass<FunctionWrapper> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-funwra", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new FunctionWrapper());
+                                  }
+                                });

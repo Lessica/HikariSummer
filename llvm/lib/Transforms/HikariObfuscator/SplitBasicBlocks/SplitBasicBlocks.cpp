@@ -2,19 +2,19 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "obfs-split"
 
-static cl::opt<unsigned> MaxSplitTimes(
-  DEBUG_TYPE "-times", cl::NotHidden,
-  cl::desc("Split each basic block into N parts"),
-  cl::init(2),
-  cl::Optional
-);
+static cl::opt<unsigned>
+  MaxSplitTimes(DEBUG_TYPE "-times", cl::NotHidden,
+                cl::desc("Split each basic block into N parts"), cl::init(2),
+                cl::Optional);
 
 STATISTIC(SplitInitialBasicBlocksCounter, "Initial number of basic blocks");
 STATISTIC(SplitFinalBasicBlocksCounter, "Final number of basic blocks");
@@ -75,5 +75,20 @@ struct SplitBasicBlocks : public FunctionPass {
 } // namespace
 
 char SplitBasicBlocks::ID = 0;
-static RegisterPass<SplitBasicBlocks>
-  X(DEBUG_TYPE, "Split each basic block into several parts");
+
+#define PASS_DESCRIPTION "Split each basic block into several parts"
+
+// Register to opt
+static RegisterPass<SplitBasicBlocks> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-split", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new SplitBasicBlocks());
+                                  }
+                                });

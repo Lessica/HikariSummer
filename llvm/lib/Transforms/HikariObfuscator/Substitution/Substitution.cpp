@@ -1,10 +1,12 @@
+#include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/CryptoUtils.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace llvm;
 
@@ -505,5 +507,20 @@ struct Substitution : public FunctionPass {
 } // namespace
 
 char Substitution::ID = 0;
-static RegisterPass<Substitution>
-  X(DEBUG_TYPE, "Enable Instruction Substitution obfuscation");
+
+#define PASS_DESCRIPTION "Enable Instruction Substitution obfuscation"
+
+// Register to opt
+static RegisterPass<Substitution> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-subobf", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new Substitution());
+                                  }
+                                });

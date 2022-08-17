@@ -1,3 +1,4 @@
+#include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
@@ -5,7 +6,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/CryptoUtils.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Local.h"
 
@@ -19,7 +20,7 @@ namespace {
 
 struct Flattening : public FunctionPass {
   static char ID; // Pass identification, replacement for typeid
-  Flattening() : FunctionPass(ID) { }
+  Flattening() : FunctionPass(ID) {}
 
   bool runOnFunction(Function &F) override { return doFlattening(&F); }
 
@@ -103,8 +104,10 @@ struct Flattening : public FunctionPass {
       SwitchVar, InsertBB);
 
     // Create main loop entry
-    LoopEntryBB = BasicBlock::Create(F->getContext(), "ObfsCFFLoopEntry", F, InsertBB);
-    LoopEndBB = BasicBlock::Create(F->getContext(), "ObfsCFFLoopEnd", F, InsertBB);
+    LoopEntryBB =
+      BasicBlock::Create(F->getContext(), "ObfsCFFLoopEntry", F, InsertBB);
+    LoopEndBB =
+      BasicBlock::Create(F->getContext(), "ObfsCFFLoopEnd", F, InsertBB);
     LoadI = new LoadInst(SwitchVar->getType()->getElementType(), SwitchVar,
                          "ObfsCFFSwitchVar", LoopEntryBB);
 
@@ -124,7 +127,8 @@ struct Flattening : public FunctionPass {
     SwitchI = SwitchInst::Create(&*F->begin(), SwitchDefaultBB, 0, LoopEntryBB);
     SwitchI->setCondition(LoadI);
 
-    // Remove branch jump from the first BB and make a jump to the main loop entry
+    // Remove branch jump from the first BB and make a jump to the main loop
+    // entry
     F->begin()->getTerminator()->eraseFromParent();
     BranchInst::Create(LoopEntryBB, &*F->begin());
 
@@ -272,6 +276,20 @@ struct Flattening : public FunctionPass {
 } // namespace
 
 char Flattening::ID = 0;
-static RegisterPass<Flattening>
-  X(DEBUG_TYPE,
-    "Enable Control Flow Flattening (CFF/FLA) obfuscation");
+
+#define PASS_DESCRIPTION "Enable Control Flow Flattening (CFF/FLA) obfuscation"
+
+// Register to opt
+static RegisterPass<Flattening> X(DEBUG_TYPE, PASS_DESCRIPTION);
+
+// Register to clang
+static cl::opt<bool> PassEnabled("enable-cffobf", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+                                  if (PassEnabled) {
+                                    PM.add(new Flattening());
+                                  }
+                                });

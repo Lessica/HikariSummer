@@ -731,18 +731,19 @@ struct AntiClassDump : public ModulePass {
 
 char AntiClassDump::ID = 0;
 
+#define PASS_DESCRIPTION "Enable protection against Objective-C class dump"
+
 // Register to opt
-static RegisterPass<AntiClassDump> X(DEBUG_TYPE,
-                                     "Enable protection against class dump");
+static RegisterPass<AntiClassDump> X(DEBUG_TYPE, PASS_DESCRIPTION);
 
 // Register to clang
+static cl::opt<bool> PassEnabled("enable-acdobf", cl::NotHidden,
+                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
+                                 cl::Optional);
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &Builder,
                                    legacy::PassManagerBase &PM) {
-                                  PM.add(new AntiClassDump());
-                                });
-static RegisterStandardPasses Z(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                                [](const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-                                  PM.add(new AntiClassDump());
+                                  if (PassEnabled) {
+                                    PM.add(new AntiClassDump());
+                                  }
                                 });
