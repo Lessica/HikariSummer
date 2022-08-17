@@ -1,13 +1,11 @@
+#include "AntiClassDump.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <algorithm>
 #include <cassert>
@@ -731,19 +729,9 @@ struct AntiClassDump : public ModulePass {
 
 char AntiClassDump::ID = 0;
 
-#define PASS_DESCRIPTION "Enable protection against Objective-C class dump"
-
 // Register to opt
-static RegisterPass<AntiClassDump> X(DEBUG_TYPE, PASS_DESCRIPTION);
+static RegisterPass<AntiClassDump> X(DEBUG_TYPE, ANTICLASSDUMP_PASS_DESCRIPTION);
 
-// Register to clang
-static cl::opt<bool> PassEnabled("enable-acdobf", cl::NotHidden,
-                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
-                                 cl::Optional);
-static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
-                                [](const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-                                  if (PassEnabled) {
-                                    PM.add(new AntiClassDump());
-                                  }
-                                });
+// Register to loader
+ModulePass *llvm::createAntiClassDumpPass() { return new AntiClassDump(); }
+INITIALIZE_PASS(AntiClassDump, DEBUG_TYPE, ANTICLASSDUMP_PASS_DESCRIPTION, false, false);

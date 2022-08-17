@@ -1,3 +1,4 @@
+#include "BogusControlFlow.h"
 #include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/BasicBlock.h"
@@ -5,11 +6,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
@@ -735,19 +732,13 @@ struct BogusControlFlow : public FunctionPass {
 
 char BogusControlFlow::ID = 0;
 
-#define PASS_DESCRIPTION "Enable Bogus Control Flow (BCF) obfuscation"
-
 // Register to opt
-static RegisterPass<BogusControlFlow> X(DEBUG_TYPE, PASS_DESCRIPTION);
+static RegisterPass<BogusControlFlow> X(DEBUG_TYPE,
+                                        BOGUSCONTROLFLOW_PASS_DESCRIPTION);
 
-// Register to clang
-static cl::opt<bool> PassEnabled("enable-bcfobf", cl::NotHidden,
-                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
-                                 cl::Optional);
-static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
-                                [](const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-                                  if (PassEnabled) {
-                                    PM.add(new BogusControlFlow());
-                                  }
-                                });
+// Register to loader
+FunctionPass *llvm::createBogusControlFlowPass() {
+  return new BogusControlFlow();
+}
+INITIALIZE_PASS(BogusControlFlow, DEBUG_TYPE, BOGUSCONTROLFLOW_PASS_DESCRIPTION,
+                false, false);

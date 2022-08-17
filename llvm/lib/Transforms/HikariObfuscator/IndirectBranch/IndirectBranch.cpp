@@ -1,14 +1,12 @@
+#include "IndirectBranch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
@@ -128,19 +126,11 @@ struct IndirectBranch : public FunctionPass {
 
 char IndirectBranch::ID = 0;
 
-#define PASS_DESCRIPTION "Enable Indirect Branch obfuscation"
-
 // Register to opt
-static RegisterPass<IndirectBranch> X(DEBUG_TYPE, PASS_DESCRIPTION);
+static RegisterPass<IndirectBranch> X(DEBUG_TYPE,
+                                      INDIRECTBRANCH_PASS_DESCRIPTION);
 
 // Register to clang
-static cl::opt<bool> PassEnabled("enable-indbra", cl::NotHidden,
-                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
-                                 cl::Optional);
-static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
-                                [](const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-                                  if (PassEnabled) {
-                                    PM.add(new IndirectBranch());
-                                  }
-                                });
+FunctionPass *llvm::createIndirectBranchPass() { return new IndirectBranch(); }
+INITIALIZE_PASS(IndirectBranch, DEBUG_TYPE, INDIRECTBRANCH_PASS_DESCRIPTION,
+                false, false);

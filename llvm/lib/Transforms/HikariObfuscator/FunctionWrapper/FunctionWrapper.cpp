@@ -1,3 +1,4 @@
+#include "FunctionWrapper.h"
 #include "../CryptoUtils/CryptoUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Function.h"
@@ -5,11 +6,8 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
@@ -156,19 +154,11 @@ struct FunctionWrapper : public ModulePass {
 
 char FunctionWrapper::ID = 0;
 
-#define PASS_DESCRIPTION "Enable Function Wrapper obfuscation"
-
 // Register to opt
-static RegisterPass<FunctionWrapper> X(DEBUG_TYPE, PASS_DESCRIPTION);
+static RegisterPass<FunctionWrapper> X(DEBUG_TYPE,
+                                       FUNCTIONWRAPPER_PASS_DESCRIPTION);
 
 // Register to clang
-static cl::opt<bool> PassEnabled("enable-funwra", cl::NotHidden,
-                                 cl::desc(PASS_DESCRIPTION), cl::init(false),
-                                 cl::Optional);
-static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
-                                [](const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-                                  if (PassEnabled) {
-                                    PM.add(new FunctionWrapper());
-                                  }
-                                });
+ModulePass *llvm::createFunctionWrapperPass() { return new FunctionWrapper(); }
+INITIALIZE_PASS(FunctionWrapper, DEBUG_TYPE, FUNCTIONWRAPPER_PASS_DESCRIPTION,
+                false, false);
