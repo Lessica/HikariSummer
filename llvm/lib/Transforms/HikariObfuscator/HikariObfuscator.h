@@ -4,6 +4,8 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 
+#define HIKARIOBFUSCATOR_PASS_DESCRIPTION "Enable HikariObfuscator"
+
 using namespace llvm;
 
 namespace llvm {

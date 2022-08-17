@@ -130,7 +130,7 @@ char IndirectBranch::ID = 0;
 static RegisterPass<IndirectBranch> X(DEBUG_TYPE,
                                       INDIRECTBRANCH_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 FunctionPass *llvm::createIndirectBranchPass() { return new IndirectBranch(); }
 INITIALIZE_PASS(IndirectBranch, DEBUG_TYPE, INDIRECTBRANCH_PASS_DESCRIPTION,
                 false, false);

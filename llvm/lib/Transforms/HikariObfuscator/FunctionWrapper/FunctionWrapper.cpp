@@ -158,7 +158,7 @@ char FunctionWrapper::ID = 0;
 static RegisterPass<FunctionWrapper> X(DEBUG_TYPE,
                                        FUNCTIONWRAPPER_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 ModulePass *llvm::createFunctionWrapperPass() { return new FunctionWrapper(); }
 INITIALIZE_PASS(FunctionWrapper, DEBUG_TYPE, FUNCTIONWRAPPER_PASS_DESCRIPTION,
                 false, false);

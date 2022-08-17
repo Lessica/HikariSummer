@@ -278,7 +278,7 @@ char Flattening::ID = 0;
 // Register to opt
 static RegisterPass<Flattening> X(DEBUG_TYPE, FLATTENING_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 FunctionPass *llvm::createFlatteningPass() { return new Flattening(); }
 INITIALIZE_PASS(Flattening, DEBUG_TYPE, FLATTENING_PASS_DESCRIPTION, false,
                 false);

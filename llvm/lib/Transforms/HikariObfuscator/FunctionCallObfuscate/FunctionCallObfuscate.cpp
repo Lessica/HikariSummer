@@ -352,7 +352,7 @@ char FunctionCallObfuscate::ID = 0;
 static RegisterPass<FunctionCallObfuscate>
   X(DEBUG_TYPE, FUNCTIONCALLOBFUSCATE_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 FunctionPass *llvm::createFunctionCallObfuscatePass() {
   return new FunctionCallObfuscate();
 }

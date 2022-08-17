@@ -509,7 +509,7 @@ char Substitution::ID = 0;
 // Register to opt
 static RegisterPass<Substitution> X(DEBUG_TYPE, SUBSTITUTION_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 FunctionPass *llvm::createSubstitutionPass() { return new Substitution(); }
 INITIALIZE_PASS(Substitution, DEBUG_TYPE, SUBSTITUTION_PASS_DESCRIPTION, false,
                 false);

@@ -19,6 +19,8 @@
 
 using namespace llvm;
 
+#define DEBUG_TYPE "obfs"
+
 static cl::opt<bool>
   AntiClassDumpEnabled("enable-acdobf", cl::NotHidden,
                        cl::desc(ANTICLASSDUMP_PASS_DESCRIPTION),
@@ -222,13 +224,17 @@ struct HikariObfuscator : public ModulePass {
 
 char HikariObfuscator::ID = 0;
 
-// Register to clang
+// Register to opt
+static RegisterPass<HikariObfuscator> X(DEBUG_TYPE,
+                                        HIKARIOBFUSCATOR_PASS_DESCRIPTION);
+
+// Register to loader
 ModulePass *llvm::createHikariObfuscatorPass() {
   return new HikariObfuscator();
 }
 
-INITIALIZE_PASS_BEGIN(HikariObfuscator, "obfs", "Enable HikariObfuscator",
-                      false, false)
+INITIALIZE_PASS_BEGIN(HikariObfuscator, DEBUG_TYPE,
+                      HIKARIOBFUSCATOR_PASS_DESCRIPTION, false, false)
 INITIALIZE_PASS_DEPENDENCY(AntiClassDump);
 INITIALIZE_PASS_DEPENDENCY(BogusControlFlow);
 INITIALIZE_PASS_DEPENDENCY(Flattening);
@@ -238,5 +244,5 @@ INITIALIZE_PASS_DEPENDENCY(IndirectBranch);
 INITIALIZE_PASS_DEPENDENCY(SplitBasicBlocks);
 INITIALIZE_PASS_DEPENDENCY(StringEncryption);
 INITIALIZE_PASS_DEPENDENCY(Substitution);
-INITIALIZE_PASS_END(HikariObfuscator, "obfs", "Enable HikariObfuscator", false,
-                    false)
+INITIALIZE_PASS_END(HikariObfuscator, DEBUG_TYPE,
+                    HIKARIOBFUSCATOR_PASS_DESCRIPTION, false, false)

@@ -78,7 +78,7 @@ char SplitBasicBlocks::ID = 0;
 static RegisterPass<SplitBasicBlocks> X(DEBUG_TYPE,
                                         SPLITBASICBLOCKS_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 FunctionPass *llvm::createSplitBasicBlocksPass() {
   return new SplitBasicBlocks();
 }

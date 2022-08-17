@@ -467,7 +467,7 @@ char StringEncryption::ID = 0;
 static RegisterPass<StringEncryption> X(DEBUG_TYPE,
                                         STRINGENCRYPTION_PASS_DESCRIPTION);
 
-// Register to clang
+// Register to loader
 ModulePass *llvm::createStringEncryptionPass() {
   return new StringEncryption();
 }
