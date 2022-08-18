@@ -72,24 +72,43 @@ struct HikariObfuscator : public ModulePass {
   HikariObfuscator() : ModulePass(ID) {}
 
   bool doInitialization(Module &M) override {
-    if (getenv("ACDOBF"))
+    errs() << "HikariObfuscator: ";
+    if (getenv("ACDOBF")) {
+      errs() << "  * AntiClassDump ";
       AntiClassDumpEnabled = true;
-    if (getenv("BCFOBF"))
+    }
+    if (getenv("BCFOBF")) {
+      errs() << "  * BogusControlFlow ";
       BogusControlFlowEnabled = true;
-    if (getenv("CFFOBF"))
+    }
+    if (getenv("CFFOBF")) {
+      errs() << "  * Flattening ";
       FlatteningEnabled = true;
-    if (getenv("FCO"))
+    }
+    if (getenv("FCO")) {
+      errs() << "  * FunctionCallObfuscate ";
       FunctionCallObfuscateEnabled = true;
-    if (getenv("FUNWRA"))
+    }
+    if (getenv("FUNWRA")) {
+      errs() << "  * FunctionWrapper ";
       FunctionWrapperEnabled = true;
-    if (getenv("INDBRA"))
+    }
+    if (getenv("INDBRA")) {
+      errs() << "  * IndirectBranch ";
       IndirectBranchEnabled = true;
-    if (getenv("SPLIT"))
+    }
+    if (getenv("SPLIT")) {
+      errs() << "  * SplitBasicBlocks ";
       SplitBasicBlocksEnabled = true;
-    if (getenv("STRCRY"))
+    }
+    if (getenv("STRCRY")) {
+      errs() << "  * StringEncryption ";
       StringEncryptionEnabled = true;
-    if (getenv("SUBOBF"))
+    }
+    if (getenv("SUBOBF")) {
+      errs() << "  * Substitution ";
       SubstitutionEnabled = true;
+    }
     return false;
   }
 

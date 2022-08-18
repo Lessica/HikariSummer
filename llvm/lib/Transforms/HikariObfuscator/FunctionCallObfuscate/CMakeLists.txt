@@ -11,3 +11,5 @@ add_llvm_library(LLVMFunctionCallObfuscate MODULE BUILDTREE_ONLY
         PLUGIN_TOOL
             opt
         )
+
+target_compile_options(LLVMFunctionCallObfuscate PRIVATE -Wno-covered-switch-default)
